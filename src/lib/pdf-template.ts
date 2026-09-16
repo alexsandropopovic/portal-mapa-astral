@@ -10,226 +10,184 @@ interface TemplateProps {
   analysisText: string;
 }
 
-// Converte nome para Title Case (ex: "alexsandro" -> "Alexsandro")
-function toTitleCase(str: string): string {
-  return str
-    .toLowerCase()
-    .split(" ")
-    .map((word) => {
-      if (["de", "da", "do", "dos", "das", "e"].includes(word)) return word;
-      return word.charAt(0).toUpperCase() + word.slice(1);
-    })
-    .join(" ");
-}
-
-// Parser completo de Markdown para HTML editorial de luxo
-function parseAstrologyMarkdown(md: string): string {
-  // 1. Remove marcadores "---" e corrige quebras de hífen
-  let text = md.replace(/^---\s*$/gm, "");
-  text = text.replace(/tornase/g, "torna-se");
-
-  // 2. Se a IA colocar tópicos na mesma linha (ex: "- Item. - Outro."), quebra para linhas separadas
-  text = text.replace(/([^\n])\s*-\s+/g, "$1\n- ");
-  text = text.replace(/([^\n])\s*(\d+\.\s+\*\*)/g, "$1\n$2");
-
-  // 3. Converte **negrito** e *itálico*
-  text = text.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
-  text = text.replace(/(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)/g, '<em class="italic text-slate-700">$1</em>');
-
-  // 4. Divide em blocos lógicos
-  const rawBlocks = text.split(/\n\s*\n/);
-  const htmlBlocks: string[] = [];
-
-  for (let block of rawBlocks) {
-    block = block.trim();
-    if (!block) continue;
-
-    // Título de Capítulo (##)
-    if (block.startsWith("## ")) {
-      const title = block.replace(/^##\s+/, "");
-      htmlBlocks.push(`
-        <div class="chapter-header page-break-before mt-8 mb-4 border-b-2 border-indigo-900/20 pb-2">
-          <span class="text-[10px] tracking-widest uppercase text-indigo-600 font-bold">Análise Arquetípica</span>
-          <h2 class="text-xl font-serif font-bold text-indigo-950">${title}</h2>
-        </div>
-      `);
-      continue;
-    }
-
-    // Subtítulo (### ou títulos curtos sem ##)
-    if (block.startsWith("### ")) {
-      const sub = block.replace(/^###\s+/, "");
-      htmlBlocks.push(`
-        <h3 class="text-sm font-bold uppercase tracking-wider text-indigo-900 mt-5 mb-2 avoid-break border-b border-indigo-100 pb-1">
-          ✦ ${sub}
-        </h3>
-      `);
-      continue;
-    }
-
-    // Lista de Marcadores (- ou *)
-    if (block.includes("\n- ") || block.startsWith("- ")) {
-      const items = block
-        .split(/\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.startsWith("- ") || line.startsWith("* "))
-        .map((line) => line.replace(/^[-*]\s+/, ""))
-        .map((item) => `<li class="text-slate-700 text-xs leading-relaxed mb-1.5 pl-1">${item}</li>`)
-        .join("");
-
-      htmlBlocks.push(`
-        <ul class="my-3 pl-4 space-y-1 list-disc list-outside marker:text-indigo-600 avoid-break bg-indigo-50/40 p-3 rounded-lg border border-indigo-100/60">
-          ${items}
-        </ul>
-      `);
-      continue;
-    }
-
-    // Lista Numerada (1. 2. 3.)
-    if (/^\d+\.\s+/.test(block) || block.includes("\n1. ")) {
-      const items = block
-        .split(/\n/)
-        .map((line) => line.trim())
-        .filter((line) => /^\d+\.\s+/.test(line))
-        .map((line) => line.replace(/^\d+\.\s+/, ""))
-        .map((item) => `<li class="text-slate-700 text-xs leading-relaxed mb-2 pl-1">${item}</li>`)
-        .join("");
-
-      htmlBlocks.push(`
-        <ol class="my-3 pl-4 space-y-1 list-decimal list-outside marker:font-bold marker:text-indigo-900 avoid-break">
-          ${items}
-        </ol>
-      `);
-      continue;
-    }
-
-    // Subtítulos embutidos que a IA cria sem "###" (ex: "Potenciais", "Desafios psicológicos")
-    if (block.length < 50 && !block.endsWith(".") && !block.includes("<")) {
-      htmlBlocks.push(`
-        <h4 class="text-xs font-bold uppercase tracking-wide text-indigo-950 mt-4 mb-1.5 avoid-break">
-          ${block}
-        </h4>
-      `);
-      continue;
-    }
-
-    // Parágrafo Normal
-    htmlBlocks.push(`
-      <p class="text-slate-700 text-xs leading-relaxed mb-3 text-justify">
-        ${block.replace(/\n/g, " ")}
-      </p>
-    `);
-  }
-
-  return htmlBlocks.join("\n");
-}
-
 export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analysisText }: TemplateProps): string {
-  const formattedName = toTitleCase(name);
   const mandalaSvg = generateChartWheelSvg(chart);
-  const formattedAnalysis = parseAstrologyMarkdown(analysisText);
+
+  // Parser inteligente para formatar a estrutura do novo prompt
+  const formattedAnalysis = analysisText
+    .split("\n\n")
+    .map((block) => {
+      const trimmed = block.trim();
+      if (!trimmed) return "";
+
+      // Linhas divisórias (---)
+      if (trimmed === "---" || trimmed === "***") {
+        return `<hr class="my-6 border-indigo-200/50" />`;
+      }
+
+      // Título de Capítulo Principal (## ) -> Força nova página
+      if (trimmed.startsWith("## ")) {
+        const title = trimmed.replace("## ", "").trim();
+        return `
+          <div class="page-break-before pt-2 mb-6">
+            <span class="text-[10px] uppercase font-bold tracking-widest text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded border border-indigo-200 inline-block mb-2">
+              Jornada Pessoal
+            </span>
+            <h2 class="text-xl font-serif font-bold text-indigo-950 border-b-2 border-indigo-200 pb-2">${title}</h2>
+          </div>
+        `;
+      }
+
+      // Seção Inicial: O Raio-X Rápido (### ) -> Abre uma página dedicada de leitura rápida
+      if (trimmed.startsWith("### ")) {
+        const title = trimmed.replace("### ", "").trim();
+        return `
+          <div class="page-break-before pt-2 mb-6 p-5 bg-gradient-to-br from-indigo-50/90 to-purple-50/60 rounded-xl border border-indigo-200/70 shadow-sm">
+            <span class="text-[10px] uppercase font-bold tracking-widest text-indigo-600 block mb-1">
+              Visão Geral • Leitura Rápida
+            </span>
+            <h3 class="text-lg font-serif font-bold text-indigo-950">${title}</h3>
+            <p class="text-xs text-indigo-800/80 mt-1">Um panorama essencial da sua jornada para consulta imediata.</p>
+          </div>
+        `;
+      }
+
+      // Verifica se o bloco contém os tópicos de destaque (mesmo que venham em linhas separadas por \n)
+      const lines = trimmed.split("\n").map((l) => l.trim()).filter(Boolean);
+      const containsCallout = lines.some((l) =>
+        l.includes("O Seu Maior Talento") ||
+        l.includes("Maior Talento") ||
+        l.includes("O Ponto de Atenção") ||
+        l.includes("Ponto de Atenção") ||
+        l.includes("Ação Prática")
+      );
+
+      if (containsCallout) {
+        return lines
+          .map((line) => {
+            // 🌟 Caixa Dourada: O Seu Maior Talento
+            if (line.includes("O Seu Maior Talento") || line.includes("Maior Talento")) {
+              const content = line
+                .replace(/.*(?:O Seu Maior Talento|Maior Talento):\*{0,2}\s*/i, "")
+                .trim();
+              return `
+                <div class="my-3 p-3.5 bg-amber-50/90 border-l-4 border-amber-500 rounded-r-lg shadow-sm">
+                  <span class="text-[11px] font-bold text-amber-900 uppercase tracking-wider block mb-1">🌟 O Seu Maior Talento</span>
+                  <p class="text-gray-800 text-xs leading-relaxed text-justify">${content}</p>
+                </div>
+              `;
+            }
+
+            // 🌑 Caixa Vinho/Rose: O Ponto de Atenção
+            if (line.includes("O Ponto de Atenção") || line.includes("Ponto de Atenção")) {
+              const content = line
+                .replace(/.*(?:O Ponto de Atenção|Ponto de Atenção):\*{0,2}\s*/i, "")
+                .trim();
+              return `
+                <div class="my-3 p-3.5 bg-rose-50/90 border-l-4 border-rose-500 rounded-r-lg shadow-sm">
+                  <span class="text-[11px] font-bold text-rose-900 uppercase tracking-wider block mb-1">🌑 O Ponto de Atenção</span>
+                  <p class="text-gray-800 text-xs leading-relaxed text-justify">${content}</p>
+                </div>
+              `;
+            }
+
+            // 🧭 Caixa Índigo: Ação Prática
+            if (line.includes("Ação Prática")) {
+              const content = line
+                .replace(/.*(?:Ação Prática):\*{0,2}\s*/i, "")
+                .trim();
+              return `
+                <div class="my-3 p-3.5 bg-indigo-50/90 border-l-4 border-indigo-600 rounded-r-lg shadow-sm">
+                  <span class="text-[11px] font-bold text-indigo-900 uppercase tracking-wider block mb-1">🧭 Ação Prática</span>
+                  <p class="text-gray-800 text-xs leading-relaxed text-justify">${content}</p>
+                </div>
+              `;
+            }
+
+            // Linha regular dentro do bloco
+            return `<p class="text-gray-700 leading-relaxed mb-3 text-justify text-sm">${line}</p>`;
+          })
+          .join("");
+      }
+
+      // Parágrafo Regular de Texto
+      return `<p class="text-gray-700 leading-relaxed mb-4 text-justify text-sm">${trimmed}</p>`;
+    })
+    .join("");
 
   return `
   <!DOCTYPE html>
   <html lang="pt-BR">
   <head>
     <meta charset="UTF-8">
-    <title>Mapa Astral - ${formattedName}</title>
+    <title>Guia Pessoal de Autoconhecimento - ${name}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       @page {
         size: A4;
-        margin: 18mm 16mm 18mm 16mm;
+        margin: 20mm 15mm 20mm 15mm;
       }
       .page-break-before {
         page-break-before: always;
       }
-      .avoid-break {
-        page-break-inside: avoid;
-        break-inside: avoid;
-      }
-      body {
-        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
     </style>
   </head>
-  <body class="bg-white text-slate-900 text-xs antialiased">
-    
-    <!-- PÁGINA 1: CAPA EDITORIAL -->
-    <div class="h-[920px] flex flex-col justify-between items-center text-center p-8 border-4 border-double border-indigo-950 rounded-xl">
-      <div class="mt-16">
-        <div class="text-indigo-900 text-4xl mb-4 tracking-widest">✦ ☽ ☉ ☾ ✦</div>
-        <h1 class="text-3xl font-serif font-bold text-indigo-950 tracking-wider uppercase">Mapa Astral Natal</h1>
-        <p class="text-slate-500 tracking-widest mt-2 uppercase text-[10px]">Livro de Síntese Psicológica e Arquetípica</p>
+  <body class="bg-white text-gray-900 text-sm">
+    <!-- PÁGINA 1: CAPA EDITORIAL HUMANIZADA -->
+    <div class="h-[900px] flex flex-col justify-between items-center text-center p-8 border-4 border-double border-indigo-950">
+      <div class="mt-10">
+        <div class="text-indigo-900 text-5xl mb-4">✦ ☽ ☉ ☾ ✦</div>
+        <h1 class="text-4xl font-serif font-bold text-indigo-950 tracking-wider uppercase">Guia de Autoconhecimento</h1>
+        <p class="text-gray-500 tracking-widest mt-2 uppercase text-xs">Seu Livro Pessoal de Propósito, Emoções e Potenciais</p>
       </div>
 
-      <div class="my-auto p-6 bg-slate-50 border border-indigo-100 rounded-2xl w-full max-w-sm shadow-sm">
-        <p class="text-[10px] text-indigo-600 font-bold uppercase tracking-wider mb-1">Elaborado exclusivamente para</p>
-        <h2 class="text-xl font-serif font-bold text-indigo-950 mb-3">${formattedName}</h2>
-        <div class="text-[11px] text-slate-600 space-y-1 border-t border-slate-200/60 pt-3">
+      <div class="my-8 p-6 bg-indigo-50/70 border border-indigo-100 rounded-2xl w-full max-w-md shadow-sm">
+        <p class="text-[11px] text-indigo-600 font-semibold uppercase tracking-wider mb-1">Preparado com carinho para</p>
+        <h2 class="text-2xl font-serif font-bold text-indigo-950 mb-3">${name}</h2>
+        <div class="text-xs text-gray-600 space-y-1">
           <p><strong>Nascimento:</strong> ${birthDate} às ${birthTime}</p>
           <p><strong>Local:</strong> ${city}</p>
         </div>
       </div>
 
-      <div class="mb-10 text-[10px] text-slate-400 tracking-wider">
-        <p>Cálculos astronômicos de efemérides celestes de alta precisão.</p>
+      <div class="mb-8 text-xs text-gray-400 max-w-sm">
+        <p>Um mapa do céu exato no instante da sua chegada ao mundo, traduzido em clareza para a sua vida real.</p>
       </div>
     </div>
 
-    <!-- PÁGINA 2: MANDALA E TODAS AS 7 COORDENADAS PLANETÁRIAS -->
+    <!-- PÁGINA 2: MANDALA VISUAL + PILARES ESSENCIAIS -->
     <div class="page-break-before pt-2 text-center">
-      <h2 class="text-xl font-serif font-bold text-indigo-950 mb-0.5">Mandala Astrológica Natal</h2>
-      <p class="text-[10px] text-slate-500 mb-3">Representação geométrica das esferas celestes no momento exato do nascimento</p>
+      <h2 class="text-2xl font-serif font-bold text-indigo-950 mb-1">Sua Mandala Astrológica</h2>
+      <p class="text-xs text-gray-500 mb-4">A fotografia astronômica exata do céu no momento do seu nascimento</p>
 
-      <div class="my-2 flex justify-center">
+      <!-- MANDALA SVG VETORIAL -->
+      <div class="my-3 flex justify-center">
         ${mandalaSvg}
       </div>
 
-      <!-- GRADE COMPLETA COM OS 7 PLANETAS -->
-      <div class="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-4 text-left">
-        <div class="p-2 bg-amber-50/70 border border-amber-200/80 rounded-lg">
-          <span class="text-[9px] text-amber-800 font-bold uppercase block">☉ Sol</span>
-          <p class="text-xs font-bold text-amber-950">${chart.sun.sign}</p>
-          <span class="text-[10px] text-amber-700 font-mono">${chart.sun.degree}</span>
+      <!-- COORDENADAS DOS ASTROS PRINCIPAIS -->
+      <div class="grid grid-cols-2 gap-3 mt-6 text-left">
+        <div class="p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+          <span class="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Sol (Identidade Central)</span>
+          <p class="text-sm font-bold text-amber-950">${chart.sun.sign} (${chart.sun.degree})</p>
         </div>
-        <div class="p-2 bg-indigo-50/70 border border-indigo-200/80 rounded-lg">
-          <span class="text-[9px] text-indigo-800 font-bold uppercase block">☽ Lua</span>
-          <p class="text-xs font-bold text-indigo-950">${chart.moon.sign}</p>
-          <span class="text-[10px] text-indigo-700 font-mono">${chart.moon.degree}</span>
+        <div class="p-2.5 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <span class="text-[10px] text-indigo-700 font-bold uppercase tracking-wider">Lua (Mundo Emocional)</span>
+          <p class="text-sm font-bold text-indigo-950">${chart.moon.sign} (${chart.moon.degree})</p>
         </div>
-        <div class="p-2 bg-slate-100 border border-slate-300 rounded-lg">
-          <span class="text-[9px] text-slate-700 font-bold uppercase block">☿ Mercúrio</span>
-          <p class="text-xs font-bold text-slate-900">${chart.mercury.sign}</p>
-          <span class="text-[10px] text-slate-600 font-mono">${chart.mercury.degree}</span>
+        <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+          <span class="text-[10px] text-slate-600 font-bold uppercase tracking-wider">Mercúrio (Mente & Voz)</span>
+          <p class="text-sm font-semibold text-slate-900">${chart.mercury.sign} (${chart.mercury.degree})</p>
         </div>
-        <div class="p-2 bg-pink-50/70 border border-pink-200/80 rounded-lg">
-          <span class="text-[9px] text-pink-800 font-bold uppercase block">♀ Vênus</span>
-          <p class="text-xs font-bold text-pink-950">${chart.venus.sign}</p>
-          <span class="text-[10px] text-pink-700 font-mono">${chart.venus.degree}</span>
-        </div>
-        <div class="p-2 bg-red-50/70 border border-red-200/80 rounded-lg">
-          <span class="text-[9px] text-red-800 font-bold uppercase block">♂ Marte</span>
-          <p class="text-xs font-bold text-red-950">${chart.mars.sign}</p>
-          <span class="text-[10px] text-red-700 font-mono">${chart.mars.degree}</span>
-        </div>
-        <div class="p-2 bg-blue-50/70 border border-blue-200/80 rounded-lg">
-          <span class="text-[9px] text-blue-800 font-bold uppercase block">♃ Júpiter</span>
-          <p class="text-xs font-bold text-blue-950">${chart.jupiter.sign}</p>
-          <span class="text-[10px] text-blue-700 font-mono">${chart.jupiter.degree}</span>
-        </div>
-        <div class="p-2 bg-purple-50/70 border border-purple-200/80 rounded-lg col-span-1 sm:col-span-2">
-          <span class="text-[9px] text-purple-800 font-bold uppercase block">♄ Saturno</span>
-          <p class="text-xs font-bold text-purple-950">${chart.saturn.sign}</p>
-          <span class="text-[10px] text-purple-700 font-mono">${chart.saturn.degree}</span>
+        <div class="p-2.5 bg-pink-50 border border-pink-200 rounded-lg">
+          <span class="text-[10px] text-pink-700 font-bold uppercase tracking-wider">Vênus (Afeto & Valores)</span>
+          <p class="text-sm font-semibold text-pink-950">${chart.venus.sign} (${chart.venus.degree})</p>
         </div>
       </div>
     </div>
 
-    <!-- PÁGINA 3 EM DIANTE: LEITURA ARQUETÍPICA DOS 8 CAPÍTULOS -->
-    <div class="mt-6">
+    <!-- PÁGINA 3 EM DIANTE: RAIO-X INICIAL + CAPÍTULOS DETALHADOS -->
+    <div>
       ${formattedAnalysis}
     </div>
   </body>
