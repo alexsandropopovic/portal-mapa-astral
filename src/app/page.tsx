@@ -22,12 +22,12 @@ export default function Home() {
     setLoading(true);
     setErrorMsg("");
     setDownloadSuccess(false);
-    setStatusText("1/4: Calculando posições astronômicas exatas...");
+    setStatusText("1/4: Calculando seu Mapa Astral...");
 
     try {
-      setTimeout(() => setStatusText("2/4: Claude 3.5 Haiku redigindo os 8 capítulos..."), 2000);
-      setTimeout(() => setStatusText("3/4: PDFShift gerando o livro com a Mandala SVG..."), 7000);
-      setTimeout(() => setStatusText("4/4: Preparando o download no seu navegador..."), 12000);
+      setTimeout(() => setStatusText("2/4: Elaborando seu Mapa Astral..."), 2000);
+      setTimeout(() => setStatusText("3/4: Formatando seu Mapa Astral..."), 7000);
+      setTimeout(() => setStatusText("4/4: Preparando a entrega do seu Mapa Astral Personalizado..."), 12000);
 
       const response = await fetch("/api/generate", {
         method: "POST",
