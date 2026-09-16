@@ -3,7 +3,7 @@ import { getCityCoordinatesAndTimezone } from "@/lib/opencage";
 import { calculateBirthChart } from "@/lib/astronomy";
 import { generatePdfHtml } from "@/lib/pdf-template";
 
-export const maxDuration = 60; // Timeout de 60 segundos na Vercel
+export const maxDuration = 60; // Timeout estendido na Vercel
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,17 +13,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Dados incompletos informados." }, { status: 400 });
     }
 
-    // 1. Coordenadas e Fuso Horário (se não tiver a chave, usa o padrão UTC-3 do Brasil)
+    // 1. Coordenadas e Fuso Horário (com fallback automático para UTC-3)
     const geo = await getCityCoordinatesAndTimezone(city);
 
     // 2. Cálculo Astronômico exato
     const chart = calculateBirthChart(birthDate, birthTime, geo.timezoneOffsetHours);
 
-    // 3. Redação dos 8 capítulos no OpenRouter com Claude 3.5 Haiku
+    // 3. Seleção dinâmica do modelo de IA via variável de ambiente
     const openRouterApiKey = process.env.OPENROUTER_API_KEY;
     if (!openRouterApiKey) {
       return NextResponse.json({ error: "OPENROUTER_API_KEY não configurada na Vercel." }, { status: 500 });
     }
+
+    // Se você definir AI_MODEL na Vercel, ele usa o que você escolher; caso contrário, usa o Claude 3.5 Haiku
+    const selectedModel = process.env.AI_MODEL || "anthropic/claude-3.5-haiku";
 
     const prompt = `
 Você é um astrólogo renomado especializado em psicologia arquetípica.
@@ -62,7 +65,7 @@ Estruture a resposta com rigor em exatamente 8 capítulos (use "## " nos título
         "X-Title": "Gerador de Mapa Astral Pro",
       },
       body: JSON.stringify({
-        model: "anthropic/claude-3.5-haiku",
+        model: selectedModel,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
       }),
@@ -70,7 +73,7 @@ Estruture a resposta com rigor em exatamente 8 capítulos (use "## " nos título
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      throw new Error(`Erro OpenRouter: ${errorText}`);
+      throw new Error(`Erro OpenRouter (${selectedModel}): ${errorText}`);
     }
 
     const aiData = await aiResponse.json();
@@ -109,7 +112,7 @@ Estruture a resposta com rigor em exatamente 8 capítulos (use "## " nos título
       throw new Error(`Erro PDFShift: ${pdfError}`);
     }
 
-    // 5. Devolve o arquivo PDF diretamente para o navegador do cliente baixar
+    // 5. Download direto do PDF no navegador
     const pdfArrayBuffer = await pdfResponse.arrayBuffer();
 
     return new NextResponse(pdfArrayBuffer, {
