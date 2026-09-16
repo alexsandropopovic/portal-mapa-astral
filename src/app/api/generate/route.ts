@@ -68,6 +68,9 @@ Estruture a resposta com rigor em exatamente 8 capítulos (use "## " nos título
         model: selectedModel,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
+		reasoning: {
+          effort: "none",
+        },
       }),
     });
 
