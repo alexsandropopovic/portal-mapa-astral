@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCityCoordinatesAndTimezone } from "@/lib/opencage";
 import { calculateBirthChart } from "@/lib/astronomy";
 import { generatePdfHtml } from "@/lib/pdf-template";
-import { uploadPdfToR2 } from "@/lib/r2";
 
-export const maxDuration = 60;
+export const maxDuration = 60; // Timeout de 60 segundos na Vercel
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,27 +13,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Dados incompletos informados." }, { status: 400 });
     }
 
-    // 1. OpenCage
+    // 1. Coordenadas e Fuso Horário (se não tiver a chave, usa o padrão UTC-3 do Brasil)
     const geo = await getCityCoordinatesAndTimezone(city);
 
-    // 2. Astronomy Engine
+    // 2. Cálculo Astronômico exato
     const chart = calculateBirthChart(birthDate, birthTime, geo.timezoneOffsetHours);
 
-    // 3. OpenRouter [Claude 3.5 Haiku]
+    // 3. Redação dos 8 capítulos no OpenRouter com Claude 3.5 Haiku
     const openRouterApiKey = process.env.OPENROUTER_API_KEY;
     if (!openRouterApiKey) {
-      return NextResponse.json({ error: "OPENROUTER_API_KEY ausente." }, { status: 500 });
+      return NextResponse.json({ error: "OPENROUTER_API_KEY não configurada na Vercel." }, { status: 500 });
     }
 
     const prompt = `
-Você é um astrólogo renomado, com vasta experiência em psicologia analítica jungiana e arquétipos.
-Elabore um livro completo e profundo de Mapa Astral Natal para:
+Você é um astrólogo renomado especializado em psicologia arquetípica.
+Elabore um livro completo de Mapa Astral Natal para:
 
 Nome: ${name}
 Nascimento: ${birthDate} às ${birthTime}
-Local: ${geo.formattedCity} (Fuso horário calculado: UTC ${geo.timezoneOffsetHours >= 0 ? `+${geo.timezoneOffsetHours}` : geo.timezoneOffsetHours})
+Local: ${geo.formattedCity} (Fuso: UTC ${geo.timezoneOffsetHours >= 0 ? `+${geo.timezoneOffsetHours}` : geo.timezoneOffsetHours})
 
-Posicionamentos celestes exatos:
+Posicionamentos celestes:
 - Sol: ${chart.sun.sign} a ${chart.sun.degree}
 - Lua: ${chart.moon.sign} a ${chart.moon.degree}
 - Mercúrio: ${chart.mercury.sign} a ${chart.mercury.degree}
@@ -43,31 +42,15 @@ Posicionamentos celestes exatos:
 - Júpiter: ${chart.jupiter.sign} a ${chart.jupiter.degree}
 - Saturno: ${chart.saturn.sign} a ${chart.saturn.degree}
 
-Estruture a resposta com rigor, usando exatamente 8 capítulos detalhados (use "## " nos títulos para permitir quebra de página automática):
-
+Estruture a resposta com rigor em exatamente 8 capítulos (use "## " nos títulos para permitir quebra de página automática):
 ## Capítulo 1: O Propósito Solar e a Consciência (Sol em ${chart.sun.sign})
-(Desenvolva a jornada do herói, o ego consciente e a missão de vida em 2 a 3 parágrafos densos)
-
 ## Capítulo 2: As Raízes da Alma e a Segurança Afetiva (Lua em ${chart.moon.sign})
-(Aborde a nutrição emocional, os padrões de infância e o mundo subjetivo)
-
 ## Capítulo 3: A Mente Racional e os Processos Cognitivos (Mercúrio em ${chart.mercury.sign})
-(Estilo de pensamento, aprendizado, comunicação e expressão intelectual)
-
 ## Capítulo 4: A Linguagem do Amor, Afeto e Valores (Vênus em ${chart.venus.sign})
-(Como se relaciona, o que valoriza esteticamente e como atrai abundância e parcerias)
-
 ## Capítulo 5: O Impulso Vital, Ambição e Coragem (Marte em ${chart.mars.sign})
-(Força de vontade, capacidade de conquista, tomada de ação e sexualidade)
-
 ## Capítulo 6: O Caminho da Expansão e Sabedoria (Júpiter em ${chart.jupiter.sign})
-(Onde reside a sorte, as oportunidades de crescimento e a visão espiritual de mundo)
-
-## Capítulo 7: Os Limites Estruturantes, Medos e Maestria (Saturno em ${chart.saturn.sign})
-(As cobranças internas, o amadurecimento ao longo do tempo e os maiores aprendizados de disciplina)
-
+## Capítulo 7: Os Limites Estruturantes e Maestria (Saturno em ${chart.saturn.sign})
 ## Capítulo 8: Síntese Arquetípica e Recomendações Práticas
-(Integre as energias contraditórias em conselhos acionáveis de autodesenvolvimento)
 `;
 
     const aiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -93,10 +76,10 @@ Estruture a resposta com rigor, usando exatamente 8 capítulos detalhados (use "
     const aiData = await aiResponse.json();
     const analysisText = aiData.choices[0]?.message?.content || "Análise indisponível.";
 
-    // 4. PDFShift
+    // 4. Compilação do PDF com a Mandala SVG no PDFShift
     const pdfShiftApiKey = process.env.PDFSHIFT_API_KEY;
     if (!pdfShiftApiKey) {
-      return NextResponse.json({ error: "PDFSHIFT_API_KEY ausente." }, { status: 500 });
+      return NextResponse.json({ error: "PDFSHIFT_API_KEY não configurada na Vercel." }, { status: 500 });
     }
 
     const fullHtml = generatePdfHtml({
@@ -126,18 +109,14 @@ Estruture a resposta com rigor, usando exatamente 8 capítulos detalhados (use "
       throw new Error(`Erro PDFShift: ${pdfError}`);
     }
 
+    // 5. Devolve o arquivo PDF diretamente para o navegador do cliente baixar
     const pdfArrayBuffer = await pdfResponse.arrayBuffer();
-    const pdfBuffer = Buffer.from(pdfArrayBuffer);
 
-    // 5. Cloudflare R2
-    const safeName = name.toLowerCase().replace(/[^a-z0-9]/g, "-");
-    const downloadUrl = await uploadPdfToR2(pdfBuffer, `mapa-${safeName}.pdf`);
-
-    return NextResponse.json({
-      success: true,
-      downloadUrl,
-      city: geo.formattedCity,
-      timezone: geo.timezoneOffsetHours,
+    return new NextResponse(pdfArrayBuffer, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="Mapa-Astral-${encodeURIComponent(name)}.pdf"`,
+      },
     });
 
   } catch (error: any) {

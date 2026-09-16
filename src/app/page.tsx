@@ -14,20 +14,20 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [lastBlobUrl, setLastBlobUrl] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg("");
-    setPdfUrl(null);
-    setStatusText("1/5: Consultando OpenCage (coordenadas e fuso)...");
+    setDownloadSuccess(false);
+    setStatusText("1/4: Calculando posições astronômicas exatas...");
 
     try {
-      setTimeout(() => setStatusText("2/5: Astronomy Engine calculando efemérides..."), 1500);
-      setTimeout(() => setStatusText("3/5: Claude 3.5 Haiku redigindo os 8 capítulos..."), 3000);
-      setTimeout(() => setStatusText("4/5: PDFShift gerando o livro com Mandala SVG..."), 8000);
-      setTimeout(() => setStatusText("5/5: Armazenando no Cloudflare R2..."), 12000);
+      setTimeout(() => setStatusText("2/4: Claude 3.5 Haiku redigindo os 8 capítulos..."), 2000);
+      setTimeout(() => setStatusText("3/4: PDFShift gerando o livro com a Mandala SVG..."), 7000);
+      setTimeout(() => setStatusText("4/4: Preparando o download no seu navegador..."), 12000);
 
       const response = await fetch("/api/generate", {
         method: "POST",
@@ -35,16 +35,27 @@ export default function Home() {
         body: JSON.stringify(formData),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || "Ocorreu um erro no processamento.");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Ocorreu um erro ao gerar o mapa.");
       }
 
-      setPdfUrl(data.downloadUrl);
-      setStatusText("Mapa Astral gerado e armazenado com sucesso no Cloudflare R2!");
+      // Recebe o arquivo PDF e dispara o download automático
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      setLastBlobUrl(url);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Mapa-Astral-${formData.name.replace(/\s+/g, "_")}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      setDownloadSuccess(true);
+      setStatusText("Mapa Astral gerado e baixado com sucesso!");
     } catch (err: any) {
-      setErrorMsg(err.message || "Erro inesperado.");
+      setErrorMsg(err.message || "Erro inesperado ao gerar o mapa.");
     } finally {
       setLoading(false);
     }
@@ -61,7 +72,7 @@ export default function Home() {
             Portal Astral Pro
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            OpenCage + Astronomy + Claude 3.5 Haiku + PDFShift + R2
+            Geração de livro de mapa natal com mandala vetorial e IA
           </p>
         </div>
 
@@ -71,29 +82,30 @@ export default function Home() {
           </div>
         )}
 
-        {pdfUrl ? (
+        {downloadSuccess ? (
           <div className="text-center py-6 space-y-4">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <CheckCircle2 className="w-8 h-8" />
             </div>
-            <h2 className="text-xl font-bold text-white">Livro Astral Pronto!</h2>
+            <h2 className="text-xl font-bold text-white">Download Concluído!</h2>
             <p className="text-xs text-slate-400">
-              Arquivo salvo no Cloudflare R2 com download ilimitado e mandala vetorial.
+              O seu arquivo PDF foi gerado com sucesso e já deve estar na pasta de downloads do seu computador.
             </p>
 
             <div className="pt-2 flex flex-col gap-2">
-              <a
-                href={pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40 transition duration-200"
-              >
-                <Download className="w-4 h-4" />
-                <span>Baixar Mapa Astral (PDF)</span>
-              </a>
+              {lastBlobUrl && (
+                <a
+                  href={lastBlobUrl}
+                  download={`Mapa-Astral-${formData.name.replace(/\s+/g, "_")}.pdf`}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40 transition duration-200"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Baixar Novamente</span>
+                </a>
+              )}
 
               <button
-                onClick={() => setPdfUrl(null)}
+                onClick={() => setDownloadSuccess(false)}
                 className="text-xs text-slate-500 hover:text-slate-300 transition mt-2"
               >
                 Gerar outro mapa astral
@@ -165,12 +177,12 @@ export default function Home() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Processando Pipeline...</span>
+                  <span>Gerando Livro em PDF...</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  <span>Gerar Livro de Mapa Astral</span>
+                  <span>Gerar e Baixar Mapa Astral</span>
                 </>
               )}
             </button>
