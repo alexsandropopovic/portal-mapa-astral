@@ -10,51 +10,79 @@ interface TemplateProps {
   analysisText: string;
 }
 
+// 1. Converte markdown básico (**negrito** e *itálico*) para HTML
+function parseMarkdownInline(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-slate-950">$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
+}
+
+// 2. Formata data de YYYY-MM-DD para DD/MM/YYYY
+function formatDateBr(dateStr: string): string {
+  if (!dateStr || !dateStr.includes("-")) return dateStr;
+  const [year, month, day] = dateStr.split("-");
+  return `${day}/${month}/${year}`;
+}
+
 export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analysisText }: TemplateProps): string {
   const mandalaSvg = generateChartWheelSvg(chart);
+  const formattedDate = formatDateBr(birthDate);
 
-  // Parser inteligente para formatar a estrutura do novo prompt
+  // 3. Processamento inteligente dos blocos de texto
   const formattedAnalysis = analysisText
     .split("\n\n")
     .map((block) => {
       const trimmed = block.trim();
       if (!trimmed) return "";
 
-      // Linhas divisórias (---)
+      // Remove divisores redundantes (---)
       if (trimmed === "---" || trimmed === "***") {
-        return `<hr class="my-6 border-indigo-200/50" />`;
+        return "";
       }
 
-      // Título de Capítulo Principal (## ) -> Força nova página
+      // Título do Raio-X Inicial (# ou ###) -> Inicia sempre em folha nova com card de apresentação
+      if (
+        trimmed.startsWith("# O RAIO-X") ||
+        trimmed.startsWith("### SEÇÃO INICIAL") ||
+        trimmed.startsWith("### O RAIO-X") ||
+        trimmed.startsWith("# SEÇÃO INICIAL")
+      ) {
+        const titleClean = trimmed.replace(/^#+\s*/, "").trim();
+        return `
+          <div class="page-break-before pt-2 mb-4 p-4 bg-indigo-50/80 rounded-xl border border-indigo-200/70 shadow-sm">
+            <span class="text-[9px] uppercase font-bold tracking-widest text-indigo-600 block mb-0.5">
+              Síntese Executiva • Leitura Rápida
+            </span>
+            <h2 class="text-lg font-serif font-bold text-indigo-950">${parseMarkdownInline(titleClean)}</h2>
+            <p class="text-[11px] text-indigo-900/80 mt-1">Um panorama essencial da sua jornada pessoal traduzido para a vida real.</p>
+          </div>
+        `;
+      }
+
+      // Títulos dos Capítulos Principais (## ) -> Força nova página para cada capítulo
       if (trimmed.startsWith("## ")) {
         const title = trimmed.replace("## ", "").trim();
         return `
-          <div class="page-break-before pt-2 mb-6">
-            <span class="text-[10px] uppercase font-bold tracking-widest text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded border border-indigo-200 inline-block mb-2">
+          <div class="page-break-before pt-2 mb-4">
+            <span class="text-[9px] uppercase font-bold tracking-widest text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 inline-block mb-1.5">
               Jornada Pessoal
             </span>
-            <h2 class="text-xl font-serif font-bold text-indigo-950 border-b-2 border-indigo-200 pb-2">${title}</h2>
+            <h2 class="text-xl font-serif font-bold text-indigo-950 border-b-2 border-indigo-200 pb-1.5 leading-snug">
+              ${parseMarkdownInline(title)}
+            </h2>
           </div>
         `;
       }
 
-      // Seção Inicial: O Raio-X Rápido (### ) -> Abre uma página dedicada de leitura rápida
+      // Subtítulos regulares (### )
       if (trimmed.startsWith("### ")) {
         const title = trimmed.replace("### ", "").trim();
-        return `
-          <div class="page-break-before pt-2 mb-6 p-5 bg-gradient-to-br from-indigo-50/90 to-purple-50/60 rounded-xl border border-indigo-200/70 shadow-sm">
-            <span class="text-[10px] uppercase font-bold tracking-widest text-indigo-600 block mb-1">
-              Visão Geral • Leitura Rápida
-            </span>
-            <h3 class="text-lg font-serif font-bold text-indigo-950">${title}</h3>
-            <p class="text-xs text-indigo-800/80 mt-1">Um panorama essencial da sua jornada para consulta imediata.</p>
-          </div>
-        `;
+        return `<h3 class="text-base font-bold text-indigo-950 mt-4 mb-2 border-b border-indigo-100 pb-1">${parseMarkdownInline(title)}</h3>`;
       }
 
-      // Verifica se o bloco contém os tópicos de destaque (mesmo que venham em linhas separadas por \n)
+      // Tratamento das Caixas de Destaque (mesmo se vierem juntas em bullet points)
       const lines = trimmed.split("\n").map((l) => l.trim()).filter(Boolean);
-      const containsCallout = lines.some((l) =>
+      const hasCallout = lines.some((l) =>
         l.includes("O Seu Maior Talento") ||
         l.includes("Maior Talento") ||
         l.includes("O Ponto de Atenção") ||
@@ -62,56 +90,52 @@ export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analy
         l.includes("Ação Prática")
       );
 
-      if (containsCallout) {
+      if (hasCallout) {
         return lines
           .map((line) => {
-            // 🌟 Caixa Dourada: O Seu Maior Talento
+            // Caixa Dourada: O Seu Maior Talento
             if (line.includes("O Seu Maior Talento") || line.includes("Maior Talento")) {
-              const content = line
-                .replace(/.*(?:O Seu Maior Talento|Maior Talento):\*{0,2}\s*/i, "")
-                .trim();
+              let content = line.replace(/.*(?:O Seu Maior Talento|Maior Talento):\*{0,2}\s*/i, "").trim();
+              content = content.charAt(0).toUpperCase() + content.slice(1);
               return `
-                <div class="my-3 p-3.5 bg-amber-50/90 border-l-4 border-amber-500 rounded-r-lg shadow-sm">
-                  <span class="text-[11px] font-bold text-amber-900 uppercase tracking-wider block mb-1">🌟 O Seu Maior Talento</span>
-                  <p class="text-gray-800 text-xs leading-relaxed text-justify">${content}</p>
+                <div class="my-2.5 p-3 bg-amber-50/90 border-l-4 border-amber-500 rounded-r-lg shadow-sm avoid-break">
+                  <span class="text-[10px] font-bold text-amber-900 uppercase tracking-wider block mb-0.5">🌟 O Seu Maior Talento</span>
+                  <p class="text-gray-800 text-xs leading-relaxed text-justify">${parseMarkdownInline(content)}</p>
                 </div>
               `;
             }
 
-            // 🌑 Caixa Vinho/Rose: O Ponto de Atenção
+            // Caixa Vinho: O Ponto de Atenção
             if (line.includes("O Ponto de Atenção") || line.includes("Ponto de Atenção")) {
-              const content = line
-                .replace(/.*(?:O Ponto de Atenção|Ponto de Atenção):\*{0,2}\s*/i, "")
-                .trim();
+              let content = line.replace(/.*(?:O Ponto de Atenção|Ponto de Atenção):\*{0,2}\s*/i, "").trim();
+              content = content.charAt(0).toUpperCase() + content.slice(1);
               return `
-                <div class="my-3 p-3.5 bg-rose-50/90 border-l-4 border-rose-500 rounded-r-lg shadow-sm">
-                  <span class="text-[11px] font-bold text-rose-900 uppercase tracking-wider block mb-1">🌑 O Ponto de Atenção</span>
-                  <p class="text-gray-800 text-xs leading-relaxed text-justify">${content}</p>
+                <div class="my-2.5 p-3 bg-rose-50/90 border-l-4 border-rose-500 rounded-r-lg shadow-sm avoid-break">
+                  <span class="text-[10px] font-bold text-rose-900 uppercase tracking-wider block mb-0.5">🌑 O Ponto de Atenção</span>
+                  <p class="text-gray-800 text-xs leading-relaxed text-justify">${parseMarkdownInline(content)}</p>
                 </div>
               `;
             }
 
-            // 🧭 Caixa Índigo: Ação Prática
+            // Caixa Índigo: Ação Prática
             if (line.includes("Ação Prática")) {
-              const content = line
-                .replace(/.*(?:Ação Prática):\*{0,2}\s*/i, "")
-                .trim();
+              let content = line.replace(/.*(?:Ação Prática):\*{0,2}\s*/i, "").trim();
+              content = content.charAt(0).toUpperCase() + content.slice(1);
               return `
-                <div class="my-3 p-3.5 bg-indigo-50/90 border-l-4 border-indigo-600 rounded-r-lg shadow-sm">
-                  <span class="text-[11px] font-bold text-indigo-900 uppercase tracking-wider block mb-1">🧭 Ação Prática</span>
-                  <p class="text-gray-800 text-xs leading-relaxed text-justify">${content}</p>
+                <div class="my-2.5 p-3 bg-indigo-50/90 border-l-4 border-indigo-600 rounded-r-lg shadow-sm avoid-break">
+                  <span class="text-[10px] font-bold text-indigo-900 uppercase tracking-wider block mb-0.5">🧭 Ação Prática</span>
+                  <p class="text-gray-800 text-xs leading-relaxed text-justify">${parseMarkdownInline(content)}</p>
                 </div>
               `;
             }
 
-            // Linha regular dentro do bloco
-            return `<p class="text-gray-700 leading-relaxed mb-3 text-justify text-sm">${line}</p>`;
+            return `<p class="text-gray-700 leading-relaxed mb-2.5 text-justify text-xs">${parseMarkdownInline(line)}</p>`;
           })
           .join("");
       }
 
-      // Parágrafo Regular de Texto
-      return `<p class="text-gray-700 leading-relaxed mb-4 text-justify text-sm">${trimmed}</p>`;
+      // Parágrafos regulares (com espaçamento otimizado para evitar páginas órfãs)
+      return `<p class="text-gray-700 leading-relaxed mb-3 text-justify text-[13px]">${parseMarkdownInline(trimmed)}</p>`;
     })
     .join("");
 
@@ -125,48 +149,52 @@ export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analy
     <style>
       @page {
         size: A4;
-        margin: 20mm 15mm 20mm 15mm;
+        margin: 18mm 15mm 18mm 15mm;
       }
       .page-break-before {
         page-break-before: always;
       }
+      .avoid-break {
+        page-break-inside: avoid;
+      }
     </style>
   </head>
   <body class="bg-white text-gray-900 text-sm">
-    <!-- PÁGINA 1: CAPA EDITORIAL HUMANIZADA -->
-    <div class="h-[900px] flex flex-col justify-between items-center text-center p-8 border-4 border-double border-indigo-950">
-      <div class="mt-10">
-        <div class="text-indigo-900 text-5xl mb-4">✦ ☽ ☉ ☾ ✦</div>
+
+    <!-- PÁGINA 1: CAPA EDITORIAL -->
+    <div class="h-[880px] flex flex-col justify-between items-center text-center p-8 border-4 border-double border-indigo-950">
+      <div class="mt-8">
+        <div class="text-indigo-900 text-4xl mb-3">✦ ☽ ☉ ☾ ✦</div>
         <h1 class="text-4xl font-serif font-bold text-indigo-950 tracking-wider uppercase">Guia de Autoconhecimento</h1>
         <p class="text-gray-500 tracking-widest mt-2 uppercase text-xs">Seu Livro Pessoal de Propósito, Emoções e Potenciais</p>
       </div>
 
-      <div class="my-8 p-6 bg-indigo-50/70 border border-indigo-100 rounded-2xl w-full max-w-md shadow-sm">
+      <div class="my-6 p-6 bg-indigo-50/70 border border-indigo-100 rounded-2xl w-full max-w-md shadow-sm">
         <p class="text-[11px] text-indigo-600 font-semibold uppercase tracking-wider mb-1">Preparado com carinho para</p>
         <h2 class="text-2xl font-serif font-bold text-indigo-950 mb-3">${name}</h2>
         <div class="text-xs text-gray-600 space-y-1">
-          <p><strong>Nascimento:</strong> ${birthDate} às ${birthTime}</p>
+          <p><strong>Nascimento:</strong> ${formattedDate} às ${birthTime}</p>
           <p><strong>Local:</strong> ${city}</p>
         </div>
       </div>
 
-      <div class="mb-8 text-xs text-gray-400 max-w-sm">
+      <div class="mb-6 text-xs text-gray-400 max-w-sm">
         <p>Um mapa do céu exato no instante da sua chegada ao mundo, traduzido em clareza para a sua vida real.</p>
       </div>
     </div>
 
-    <!-- PÁGINA 2: MANDALA VISUAL + PILARES ESSENCIAIS -->
+    <!-- PÁGINA 2: MANDALA VISUAL (EXCLUSIVA, SEM VAZAMENTO DE TEXTO) -->
     <div class="page-break-before pt-2 text-center">
       <h2 class="text-2xl font-serif font-bold text-indigo-950 mb-1">Sua Mandala Astrológica</h2>
-      <p class="text-xs text-gray-500 mb-4">A fotografia astronômica exata do céu no momento do seu nascimento</p>
+      <p class="text-xs text-gray-500 mb-3">A fotografia astronômica exata do céu no momento do seu nascimento</p>
 
       <!-- MANDALA SVG VETORIAL -->
-      <div class="my-3 flex justify-center">
+      <div class="my-2 flex justify-center">
         ${mandalaSvg}
       </div>
 
       <!-- COORDENADAS DOS ASTROS PRINCIPAIS -->
-      <div class="grid grid-cols-2 gap-3 mt-6 text-left">
+      <div class="grid grid-cols-2 gap-3 mt-5 text-left">
         <div class="p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
           <span class="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Sol (Identidade Central)</span>
           <p class="text-sm font-bold text-amber-950">${chart.sun.sign} (${chart.sun.degree})</p>
@@ -186,10 +214,11 @@ export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analy
       </div>
     </div>
 
-    <!-- PÁGINA 3 EM DIANTE: RAIO-X INICIAL + CAPÍTULOS DETALHADOS -->
+    <!-- PÁGINA 3 EM DIANTE: RAIO-X + CAPÍTULOS (SEMPRE INICIA EM PÁGINA NOVA) -->
     <div>
       ${formattedAnalysis}
     </div>
+
   </body>
   </html>
   `;
