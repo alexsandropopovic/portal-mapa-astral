@@ -3,7 +3,7 @@ import { getCityCoordinatesAndTimezone } from "@/lib/opencage";
 import { calculateBirthChart } from "@/lib/astronomy";
 import { generatePdfHtml } from "@/lib/pdf-template";
 
-export const maxDuration = 60; // Timeout máximo da Vercel
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
@@ -88,7 +88,6 @@ TÍTULOS DOS CAPÍTULOS:
 (No Capítulo 8, escreva uma conclusão calorosa integrando tudo o que foi dito. Reforce que o mapa é um ponto de partida para o crescimento e deixe uma mensagem inspiradora direcionada a ${name}).
 `;
 
-    // Timeout de 45s de proteção
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
 
@@ -105,7 +104,6 @@ TÍTULOS DOS CAPÍTULOS:
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
         max_tokens: 3800,
-        // DESABILITA O MODO REASONING / THINKING TOKENS NO OPENROUTER:
         reasoning: {
           effort: "none",
           exclude: true,
@@ -124,12 +122,7 @@ TÍTULOS DOS CAPÍTULOS:
     const aiData = await aiResponse.json();
     const analysisText = aiData.choices[0]?.message?.content || "Análise indisponível.";
 
-    // 4. Compilação do PDF com a Mandala SVG no PDFShift
-    const pdfShiftApiKey = process.env.PDFSHIFT_API_KEY;
-    if (!pdfShiftApiKey) {
-      return NextResponse.json({ error: "PDFSHIFT_API_KEY não configurada na Vercel." }, { status: 500 });
-    }
-
+    // 4. Monta o HTML completo (sem converter em PDF ainda)
     const fullHtml = generatePdfHtml({
       name,
       birthDate,
@@ -139,32 +132,11 @@ TÍTULOS DOS CAPÍTULOS:
       analysisText,
     });
 
-    const pdfResponse = await fetch("https://api.pdfshift.io/v3/convert/pdf", {
-      method: "POST",
-      headers: {
-        "Authorization": `Basic ${Buffer.from(`api:${pdfShiftApiKey}`).toString("base64")}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        source: fullHtml,
-        format: "A4",
-        margin: "0px",
-      }),
-    });
-
-    if (!pdfResponse.ok) {
-      const pdfError = await pdfResponse.text();
-      throw new Error(`Erro PDFShift: ${pdfError}`);
-    }
-
-    // 5. Download direto do PDF no navegador
-    const pdfArrayBuffer = await pdfResponse.arrayBuffer();
-
-    return new NextResponse(pdfArrayBuffer, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="Guia-Autoconhecimento-${encodeURIComponent(name)}.pdf"`,
-      },
+    // 5. Devolve o HTML e o nome para o frontend
+    return NextResponse.json({
+      success: true,
+      name,
+      html: fullHtml,
     });
 
   } catch (error: any) {

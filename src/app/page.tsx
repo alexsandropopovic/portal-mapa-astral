@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, Loader2, Download, MoonStar, CheckCircle2 } from "lucide-react";
+import { Sparkles, Loader2, Download, MoonStar, Eye, CheckCircle2 } from "lucide-react";
+
+interface GeneratedData {
+  name: string;
+  html: string;
+}
 
 export default function Home() {
   const [formData, setFormData] = useState({
@@ -14,20 +19,20 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const [downloadSuccess, setDownloadSuccess] = useState(false);
-  const [lastBlobUrl, setLastBlobUrl] = useState<string | null>(null);
+  const [generatedData, setGeneratedData] = useState<GeneratedData | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
+  // 1. Gera o mapa e prepara o HTML
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg("");
-    setDownloadSuccess(false);
-    setStatusText("1/4: Calculando seu Mapa Astral...");
+    setGeneratedData(null);
+    setStatusText("1/3: Consultando efemérides astronômicas e fuso horário...");
 
     try {
-      setTimeout(() => setStatusText("2/4: Elaborando seu Mapa Astral..."), 2000);
-      setTimeout(() => setStatusText("3/4: Formatando seu Mapa Astral..."), 7000);
-      setTimeout(() => setStatusText("4/4: Preparando a entrega do seu Mapa Astral Personalizado..."), 12000);
+      setTimeout(() => setStatusText("2/3: Traçando os aspectos da sua mandala natal..."), 2000);
+      setTimeout(() => setStatusText("3/3: Redigindo seu raio-x pessoal e os 8 capítulos..."), 5000);
 
       const response = await fetch("/api/generate", {
         method: "POST",
@@ -40,24 +45,58 @@ export default function Home() {
         throw new Error(errorData.error || "Ocorreu um erro ao gerar o mapa.");
       }
 
-      // Recebe o arquivo PDF e dispara o download automático
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      setLastBlobUrl(url);
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Mapa-Astral-${formData.name.replace(/\s+/g, "_")}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-
-      setDownloadSuccess(true);
-      setStatusText("Mapa Astral gerado e baixado com sucesso!");
+      const data = await response.json();
+      setGeneratedData({ name: data.name, html: data.html });
+      setStatusText("Mapa Astral gerado com sucesso!");
     } catch (err: any) {
       setErrorMsg(err.message || "Erro inesperado ao gerar o mapa.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 2. Abre o mapa direto no navegador (nova aba)
+  const handlePreviewHtml = () => {
+    if (!generatedData) return;
+    const blob = new Blob([generatedData.html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+  };
+
+  // 3. Exporta e baixa o PDF apenas sob demanda
+  const handleDownloadPdf = async () => {
+    if (!generatedData) return;
+    setPdfLoading(true);
+    setErrorMsg("");
+
+    try {
+      const response = await fetch("/api/export-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          html: generatedData.html,
+          name: generatedData.name,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Erro ao compilar o PDF.");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Guia-Autoconhecimento-${encodeURIComponent(generatedData.name)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Falha ao baixar o PDF.");
+    } finally {
+      setPdfLoading(false);
     }
   };
 
@@ -82,33 +121,52 @@ export default function Home() {
           </div>
         )}
 
-        {downloadSuccess ? (
-          <div className="text-center py-6 space-y-4">
+        {generatedData ? (
+          <div className="text-center py-4 space-y-5">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <CheckCircle2 className="w-8 h-8" />
             </div>
-            <h2 className="text-xl font-bold text-white">Download Concluído!</h2>
-            <p className="text-xs text-slate-400">
-              O seu arquivo PDF foi gerado com sucesso e já deve estar na pasta de downloads do seu computador.
-            </p>
+            <div>
+              <h2 className="text-xl font-bold text-white">Mapa Astral Pronto!</h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Escolha abaixo como você deseja explorar o seu guia personalizado:
+              </p>
+            </div>
 
-            <div className="pt-2 flex flex-col gap-2">
-              {lastBlobUrl && (
-                <a
-                  href={lastBlobUrl}
-                  download={`Mapa-Astral-${formData.name.replace(/\s+/g, "_")}.pdf`}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40 transition duration-200"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Baixar Novamente</span>
-                </a>
-              )}
+            <div className="pt-2 flex flex-col gap-3">
+              {/* Botão 1: Ver no Navegador */}
+              <button
+                onClick={handlePreviewHtml}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/40 transition duration-200"
+              >
+                <Eye className="w-4 h-4" />
+                <span>Ver Mapa no Navegador (HTML)</span>
+              </button>
+
+              {/* Botão 2: Baixar PDF (Só gera quando clicado) */}
+              <button
+                onClick={handleDownloadPdf}
+                disabled={pdfLoading}
+                className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-50 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition duration-200"
+              >
+                {pdfLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+                    <span>Compilando PDF no PDFShift...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 text-purple-400" />
+                    <span>Baixar Livro Completo em PDF</span>
+                  </>
+                )}
+              </button>
 
               <button
-                onClick={() => setDownloadSuccess(false)}
+                onClick={() => setGeneratedData(null)}
                 className="text-xs text-slate-500 hover:text-slate-300 transition mt-2"
               >
-                Gerar outro mapa astral
+                ← Gerar outro mapa astral
               </button>
             </div>
           </div>
@@ -177,12 +235,12 @@ export default function Home() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Gerando Livro em PDF...</span>
+                  <span>Gerando Mapa Astral...</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  <span>Gerar e Baixar Mapa Astral</span>
+                  <span>Gerar Mapa Astral</span>
                 </>
               )}
             </button>
