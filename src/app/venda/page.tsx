@@ -14,7 +14,7 @@ export default function PaginaVenda() {
       {/* ================================================================= */}
       <div className="w-full bg-white border-b border-slate-200 py-3.5 text-center">
         <span className="text-xs sm:text-sm font-black uppercase tracking-widest text-slate-600">
-          MANUAL PRÁTICO DO <span className="text-indigo-900 font-extrabold">CÓDIGO ASTRAL</span> •
+          ISTO NÃO É UM MAPA GENÉRICO <span className="text-indigo-900 font-extrabold">É O MANUAL PARA SUA VIDA</span> •
         </span>
       </div>
 
@@ -29,7 +29,7 @@ export default function PaginaVenda() {
           </p>
 
           <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-slate-900 leading-tight sm:leading-snug mb-5">
-            Descubra o seu <span className="text-indigo-900 underline decoration-indigo-300">Manual de Instruções Pessoal</span> para parar de remar contra a maré e tomar decisões com 100% de clareza na carreira e finanças!
+            O Mapa para você entender seu <span className="text-indigo-900 underline decoration-indigo-300">Manual de Instruções Pessoal</span> em menos de 15 minutos, mesmo que você já tenha se frustrado com mapas genéricos!
           </h1>
 
           <div className="inline-flex items-center gap-2 bg-slate-900 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-full mb-8 shadow-sm">
