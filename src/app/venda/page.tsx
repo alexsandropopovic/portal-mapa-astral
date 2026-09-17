@@ -315,7 +315,7 @@ export default function PaginaVenda() {
             </div>
             <div className="p-3.5 flex justify-between items-center text-slate-700">
               <span>✔ Mandala Astrológica Vetorial</span>
-              <span class="font-bold text-rose-600 line-through">R$ 64,00</span>
+              <span className="font-bold text-rose-600 line-through">R$ 64,00</span>
             </div>
             <div className="p-3.5 flex justify-between items-center text-slate-700">
               <span>✔ Matriz de Luz vs. Sombra dos Planetas</span>
@@ -337,7 +337,7 @@ export default function PaginaVenda() {
       {/* ================================================================= */}
       {/* BLOCO 9: VALOR / CHECKOUT PRINCIPAL */}
       {/* ================================================================= */}
-      <section id="oferta" className="w-full bg-[#0284C7] py-14 sm:py-20 text-center">
+      <section id="oferta" class="w-full bg-[#0284C7] py-14 sm:py-20 text-center">
         <div className="max-w-3xl mx-auto px-4">
           
           <p className="text-white font-bold text-xs sm:text-sm uppercase tracking-wider mb-6">
