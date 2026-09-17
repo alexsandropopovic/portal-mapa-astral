@@ -173,7 +173,7 @@ export default function PaginaVenda() {
             <div className="bg-white p-6 rounded-2xl border border-slate-300 shadow-sm flex flex-col md:flex-row items-center gap-6">
               <div className="w-full md:w-72 shrink-0 rounded-xl overflow-hidden shadow-md border border-slate-200 bg-white">
 			  <img 
-				src="/mockup-dossie-4-trilhas.jpg" 
+				src="/mockup-dossie-4-trilhas.png" 
 				alt="Mockup do Dossiê de Engenharia Comportamental do Código Astral" 
 				className="w-full h-auto block object-cover"
 				loading="lazy"
