@@ -171,9 +171,14 @@ export default function PaginaVenda() {
 
           <div className="space-y-6">
             <div className="bg-white p-6 rounded-2xl border border-slate-300 shadow-sm flex flex-col md:flex-row items-center gap-6">
-              <div className="w-full md:w-52 h-36 bg-indigo-900 rounded-xl flex items-center justify-center text-white font-mono text-xs font-bold p-4 text-center shadow-md">
-                [ MOCKUP: DOSSIÊ 4 TRILHAS ]
-              </div>
+              <div className="w-full md:w-72 shrink-0 rounded-xl overflow-hidden shadow-md border border-slate-200 bg-white">
+			  <img 
+				src="/mockup-dossie-4-trilhas.jpg" 
+				alt="Mockup do Dossiê de Engenharia Comportamental do Código Astral" 
+				className="w-full h-auto block object-cover"
+				loading="lazy"
+			  />
+			</div>
               <div className="flex-1 text-center md:text-left">
                 <h3 className="font-black text-base sm:text-xl text-slate-900 mb-2">
                   Dossiê de Engenharia Comportamental (4 Trilhas)
