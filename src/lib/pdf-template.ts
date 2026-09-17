@@ -33,7 +33,7 @@ export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analy
   const mandalaSvg = generateChartWheelSvg(chart);
   const formattedDate = formatDateBr(birthDate);
 
-  // 4. Processamento inteligente das Trilhas e Seções
+  // 4. Processamento inteligente das seções
   const formattedAnalysis = analysisText
     .split("\n\n")
     .map((block) => {
@@ -43,43 +43,44 @@ export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analy
       // Ignora divisores redundantes
       if (trimmed === "---" || trimmed === "***") return "";
 
-      // Ignora o título redundante do documento (# CÓDIGO ASTRAL...) que vazava após a mandala
+      // Ignora repetições do título geral que possam vazar
       if (
         trimmed.startsWith("# CÓDIGO ASTRAL") ||
         trimmed.startsWith("# CODIGO ASTRAL") ||
-        trimmed.includes("DOSSIÊ DE ENGENHARIA COMPORTAMENTAL EM 4 TRILHAS") && !trimmed.startsWith("## TRILHA")
+        (trimmed.includes("DOSSIÊ DE ENGENHARIA COMPORTAMENTAL") && !trimmed.includes("TRILHA"))
       ) {
         return "";
       }
 
-      // Seção Inicial: O Raio-X Executivo (Sempre inicia em página própria)
-      if (trimmed.includes("RAIO-X EXECUTIVO") || trimmed.includes("SEÇÃO INICIAL")) {
+      // Seção Inicial: O Raio-X da Alma (Inicia sempre em folha nova)
+      if (trimmed.toUpperCase().includes("RAIO-X")) {
         const titleClean = cleanTitleHashes(trimmed);
         return `
-          <div class="page-break-before my-6 sm:my-8 p-5 sm:p-6 bg-gradient-to-br from-indigo-50/90 to-purple-50/50 rounded-2xl border border-indigo-200/80 shadow-sm">
-            <span class="text-[10px] uppercase font-bold tracking-widest text-indigo-700 bg-white px-2.5 py-0.5 rounded-full border border-indigo-200/60 inline-block mb-2">
-              Síntese Executiva • Leitura em 10 Minutos
-            </span>
-            <h2 class="text-xl sm:text-2xl font-serif font-bold text-indigo-950">${parseMarkdownInline(titleClean)}</h2>
-            <p class="text-xs sm:text-sm text-indigo-900/80 mt-1">Um panorama essencial da sua matriz pessoal traduzido para tomada de decisão.</p>
+          <div class="page-break-before pt-4 sm:pt-6 mb-5">
+            <div class="p-5 sm:p-6 bg-gradient-to-br from-indigo-50/90 to-purple-50/50 rounded-2xl border border-indigo-200/80 shadow-sm">
+              <span class="text-[10px] uppercase font-bold tracking-widest text-indigo-700 bg-white px-2.5 py-0.5 rounded-full border border-indigo-200/60 inline-block mb-2">
+                Síntese da Alma • Leitura em 10 Minutos
+              </span>
+              <h2 class="text-xl sm:text-2xl font-serif font-bold text-indigo-950">${parseMarkdownInline(titleClean)}</h2>
+              <p class="text-xs sm:text-sm text-indigo-900/80 mt-1">Um panorama essencial da sua paisagem interior traduzido com clareza e reverência.</p>
+            </div>
           </div>
         `;
       }
 
-      // Títulos das Trilhas e Síntese Estratégica (## )
-      if (trimmed.startsWith("## ")) {
+      // Títulos das Trilhas e Síntese Estratégica (## ) -> Força nova página
+      if (trimmed.startsWith("## ") || trimmed.toUpperCase().includes("TRILHA ") || trimmed.toUpperCase().includes("SÍNTESE ESTRATÉGICA")) {
         const titleClean = cleanTitleHashes(trimmed.replace("## ", ""));
         
-        // Atribui crachá temático específico para cada trilha
-        let badge = "Engenharia Comportamental";
-        if (titleClean.includes("TRILHA 1")) badge = "Trilha 01 • Potência Financeira";
-        else if (titleClean.includes("TRILHA 2")) badge = "Trilha 02 • Blindagem de Bloqueios";
-        else if (titleClean.includes("TRILHA 3")) badge = "Trilha 03 • Matriz Relacional";
-        else if (titleClean.includes("TRILHA 4")) badge = "Trilha 04 • Radar de Ciclos";
-        else if (titleClean.includes("SÍNTESE")) badge = "Manifesto Final • Autogestão";
+        let badge = "Dimensão da Alma";
+        if (titleClean.toUpperCase().includes("TRILHA 1")) badge = "Trilha 01 • Vocação Sagrada & Abundância";
+        else if (titleClean.toUpperCase().includes("TRILHA 2")) badge = "Trilha 02 • Mistérios da Sombra & Consciência";
+        else if (titleClean.toUpperCase().includes("TRILHA 3")) badge = "Trilha 03 • Templo dos Afetos & Relações";
+        else if (titleClean.toUpperCase().includes("TRILHA 4")) badge = "Trilha 04 • Radar dos Ciclos & Roda do Tempo";
+        else if (titleClean.toUpperCase().includes("SÍNTESE")) badge = "Manifesto Final • Luz Pessoal";
 
         return `
-          <div class="page-break-before pt-6 sm:pt-8 mb-5 border-t border-slate-200/60 sm:border-none">
+          <div class="page-break-before pt-6 sm:pt-8 mb-5">
             <span class="text-[10px] uppercase font-bold tracking-widest text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200/60 inline-block mb-1.5">
               ${badge}
             </span>
@@ -96,21 +97,7 @@ export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analy
         return `<h3 class="text-base sm:text-lg font-bold text-indigo-950 mt-5 mb-2">${parseMarkdownInline(titleClean)}</h3>`;
       }
 
-      // Formatação especial das 4 Fases Trimestrais da Trilha 4 (Linha do Tempo)
-      if (
-        trimmed.startsWith("Fase 1") ||
-        trimmed.startsWith("Fase 2") ||
-        trimmed.startsWith("Fase 3") ||
-        trimmed.startsWith("Fase 4")
-      ) {
-        return `
-          <div class="my-2.5 p-3.5 bg-slate-50 border-l-4 border-indigo-500 rounded-r-xl border border-slate-200/60 shadow-sm">
-            <p class="text-xs sm:text-sm text-slate-800 leading-relaxed text-justify">${parseMarkdownInline(trimmed)}</p>
-          </div>
-        `;
-      }
-
-      // Caixas de Destaque (Superpoder, Ponto de Atenção e Ação Prática)
+      // Caixas de Destaque com proteção estrita contra quebra ao meio
       const lines = trimmed.split("\n").map((l) => l.trim()).filter(Boolean);
       const hasCallout = lines.some((l) =>
         l.includes("O Seu Maior Talento") ||
@@ -128,7 +115,7 @@ export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analy
               let content = line.replace(/.*(?:O Seu Maior Talento|Maior Talento):\*{0,2}\s*/i, "").trim();
               content = content.charAt(0).toUpperCase() + content.slice(1);
               return `
-                <div class="my-3 p-3.5 sm:p-4 bg-amber-50/90 border border-amber-200/70 border-l-4 border-l-amber-500 rounded-xl shadow-sm avoid-break">
+                <div class="avoid-break my-3 p-3.5 sm:p-4 bg-amber-50/90 border border-amber-200/70 border-l-4 border-l-amber-500 rounded-xl shadow-sm" style="page-break-inside: avoid !important; break-inside: avoid !important;">
                   <span class="text-[10px] sm:text-[11px] font-bold text-amber-900 uppercase tracking-wider block mb-1">
                     🌟 O Seu Maior Talento
                   </span>
@@ -142,7 +129,7 @@ export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analy
               let content = line.replace(/.*(?:O Ponto de Atenção|Ponto de Atenção):\*{0,2}\s*/i, "").trim();
               content = content.charAt(0).toUpperCase() + content.slice(1);
               return `
-                <div class="my-3 p-3.5 sm:p-4 bg-rose-50/90 border border-rose-200/70 border-l-4 border-l-rose-500 rounded-xl shadow-sm avoid-break">
+                <div class="avoid-break my-3 p-3.5 sm:p-4 bg-rose-50/90 border border-rose-200/70 border-l-4 border-l-rose-500 rounded-xl shadow-sm" style="page-break-inside: avoid !important; break-inside: avoid !important;">
                   <span class="text-[10px] sm:text-[11px] font-bold text-rose-900 uppercase tracking-wider block mb-1">
                     🌑 O Ponto de Atenção
                   </span>
@@ -156,7 +143,7 @@ export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analy
               let content = line.replace(/.*(?:Ação Prática):\*{0,2}\s*/i, "").trim();
               content = content.charAt(0).toUpperCase() + content.slice(1);
               return `
-                <div class="my-3 p-3.5 sm:p-4 bg-indigo-50/90 border border-indigo-200/70 border-l-4 border-l-indigo-600 rounded-xl shadow-sm avoid-break">
+                <div class="avoid-break my-3 p-3.5 sm:p-4 bg-indigo-50/90 border border-indigo-200/70 border-l-4 border-l-indigo-600 rounded-xl shadow-sm" style="page-break-inside: avoid !important; break-inside: avoid !important;">
                   <span class="text-[10px] sm:text-[11px] font-bold text-indigo-900 uppercase tracking-wider block mb-1">
                     🧭 Ação Prática
                   </span>
@@ -180,56 +167,80 @@ export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analy
   <html lang="pt-BR" class="scroll-smooth">
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Código Astral: Dossiê em 4 Trilhas - ${name}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+      /* REGRAS RÍGIDAS DE IMPRESSÃO A4 (PDFSHIFT) */
       @media print {
         @page {
           size: A4;
-          margin: 18mm 15mm 18mm 15mm;
+          margin: 16mm 15mm 16mm 15mm;
+        }
+        html, body, main, section, article, div {
+          overflow: visible !important;
+          overflow-x: visible !important;
+          height: auto !important;
         }
         body {
           background-color: #ffffff !important;
           padding: 0 !important;
         }
+        .reader-container {
+          max-width: 100% !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
         .page-break-before {
           page-break-before: always !important;
           break-before: page !important;
+        }
+        .page-break-after {
+          page-break-after: always !important;
+          break-after: page !important;
         }
         .avoid-break {
           page-break-inside: avoid !important;
           break-inside: avoid !important;
         }
         .cover-page {
-          height: 880px !important;
+          min-height: 940px !important;
+          height: 940px !important;
+          page-break-after: always !important;
+          break-after: page !important;
           margin-bottom: 0 !important;
         }
-        .reader-container {
-          max-width: 100% !important;
-          padding: 0 !important;
-          margin: 0 !important;
+        .mandala-page {
+          min-height: 940px !important;
+          page-break-after: always !important;
+          break-after: page !important;
         }
       }
 
+      /* REGRAS PARA VISUALIZAÇÃO EM TELA (MOBILE E DESKTOP) */
       @media screen {
         body {
           background-color: #f8fafc;
+          overflow-x: hidden;
         }
         .cover-page {
           min-height: 70vh;
         }
+        .reader-container {
+          overflow-x: hidden;
+        }
       }
     </style>
   </head>
-  <body class="text-slate-900 antialiased py-2 sm:py-8 px-1 sm:px-4 overflow-x-hidden">
+  <body class="text-slate-900 antialiased py-2 sm:py-8 px-1 sm:px-4">
 
-    <!-- CONTAINER RESPONSIVO CENTRALIZADO -->
-    <main class="reader-container max-w-3xl mx-auto bg-white sm:shadow-xl sm:rounded-3xl p-3 sm:p-10 border-0 sm:border border-slate-200/60 overflow-hidden">
+    <main class="reader-container max-w-3xl mx-auto bg-white sm:shadow-xl sm:rounded-3xl p-3 sm:p-10 border-0 sm:border border-slate-200/60">
 
-      <!-- 1. CAPA COM TÍTULO OFICIAL DO CÓDIGO ASTRAL -->
-      <section class="cover-page flex flex-col justify-between items-center text-center p-4 sm:p-8 border-2 sm:border-4 border-indigo-950 sm:border-double rounded-2xl bg-gradient-to-b from-indigo-50/20 to-white mb-8 sm:mb-14 overflow-hidden">
-        <div class="mt-2 sm:mt-6 w-full">
+      <!-- PÁGINA 1: CAPA COM QUEBRA FORÇADA NO FINAL (page-break-after) -->
+      <section class="cover-page page-break-after flex flex-col justify-between items-center text-center p-4 sm:p-8 border-2 sm:border-4 border-indigo-950 sm:border-double rounded-2xl bg-gradient-to-b from-indigo-50/20 to-white mb-8 sm:mb-14">
+        <div class="mt-4 sm:mt-8 w-full">
           <div class="text-indigo-900 text-2xl sm:text-3xl mb-2 tracking-widest">✦ ☽ ☉ ☾ ✦</div>
           
           <h1 class="text-2xl sm:text-4xl font-serif font-black text-indigo-950 tracking-wider uppercase leading-tight">
@@ -244,11 +255,11 @@ export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analy
           </p>
         </div>
 
-        <div class="my-4 sm:my-6 p-4 sm:p-6 bg-indigo-50/70 border border-indigo-100 rounded-xl w-full max-w-sm shadow-sm">
+        <div class="my-6 p-4 sm:p-6 bg-indigo-50/70 border border-indigo-100 rounded-xl w-full max-w-sm shadow-sm">
           <p class="text-[9px] sm:text-[10px] text-indigo-600 font-semibold uppercase tracking-wider mb-1">
             Preparado exclusivamente para
           </p>
-          <h2 class="text-lg sm:text-2xl font-serif font-bold text-indigo-950 mb-1.5 sm:mb-2 capitalize">
+          <h2 class="text-lg sm:text-2xl font-serif font-bold text-indigo-950 mb-1.5 capitalize">
             ${name}
           </h2>
           <div class="text-[11px] sm:text-xs text-slate-600 space-y-0.5">
@@ -257,13 +268,13 @@ export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analy
           </div>
         </div>
 
-        <div class="mb-2 text-[10px] sm:text-xs text-slate-400 max-w-xs px-2">
+        <div class="mb-4 text-[10px] sm:text-xs text-slate-400 max-w-xs px-2">
           <p>Decodificação de coordenadas celestes traduzidas em clareza prática para sua vida real.</p>
         </div>
       </section>
 
-      <!-- 2. MANDALA ASTRAL + COORDENADAS (ISOLADA) -->
-      <section class="page-break-before pt-2 sm:pt-4 text-center mb-8 sm:mb-14">
+      <!-- PÁGINA 2: MANDALA ASTRAL ISOLADA COM QUEBRA FORÇADA NO FINAL (page-break-after) -->
+      <section class="mandala-page page-break-after pt-4 sm:pt-6 text-center mb-8 sm:mb-14">
         <h2 class="text-xl sm:text-3xl font-serif font-bold text-indigo-950 mb-1">
           Sua Mandala Astrológica
         </h2>
@@ -271,11 +282,11 @@ export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analy
           A fotografia astronômica exata do céu no momento do seu nascimento
         </p>
 
-        <div class="my-2 flex justify-center w-full max-w-[280px] sm:max-w-[380px] mx-auto">
+        <div class="my-3 flex justify-center w-full max-w-[280px] sm:max-w-[380px] mx-auto">
           ${mandalaSvg}
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mt-5 text-left max-w-md mx-auto">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mt-6 text-left max-w-md mx-auto">
           <div class="p-2.5 sm:p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl">
             <span class="text-[9px] sm:text-[10px] text-amber-800 font-bold uppercase tracking-wider block">Sol (Identidade Central)</span>
             <p class="text-xs sm:text-base font-bold text-amber-950">${chart.sun.sign} (${chart.sun.degree})</p>
@@ -295,7 +306,7 @@ export function generatePdfHtml({ name, birthDate, birthTime, city, chart, analy
         </div>
       </section>
 
-      <!-- 3. CONTEÚDO DAS 4 TRILHAS -->
+      <!-- PÁGINA 3 EM DIANTE: RAIO-X + TRILHAS -->
       <article class="prose-slate max-w-none">
         ${formattedAnalysis}
       </article>
